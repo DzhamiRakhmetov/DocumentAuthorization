@@ -12,12 +12,12 @@ final class LoginByDocumentViewModel {
     func authentificateUserBy(documentNumber: String, password: String) -> String {
         if let user = DocumentAuthorization.loginPassword.first(where: { $0.passportNumber == documentNumber }) {
             if user.password == password {
-                return "Успешная авторизация"
+                return TextLabels.LoginByDocumentVC.autorizationSuccess
             } else {
-                return "Неверный пароль"
+                return TextLabels.LoginByDocumentVC.wrongPassword
             }
         } else {
-            return "Такой документ не зарегистрирован в системе"
+            return TextLabels.LoginByDocumentVC.wrongEmail
         }
     }
 }
