@@ -33,6 +33,7 @@ final class LoginByDocumentViewController: UIViewController {
         textField.keyboardType = .phonePad
         textField.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
         textField.clearButtonMode = .whileEditing
+        textField.delegate = self
         textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
         return textField
     }()
@@ -44,21 +45,14 @@ final class LoginByDocumentViewController: UIViewController {
         textField.borderStyle = .roundedRect
         textField.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
         textField.enablePasswordToggle()
+        textField.delegate = self
         textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
         return textField
     }()
     
-    private lazy var passwordErrorLabel: UILabel = {
+    private lazy var errorLabel: UILabel = {
         let label = UILabel()
-        label.text = "Пароль должен содержать от 6 до 20 символов"
-        label.textColor = .red
-        label.font = UIFont.systemFont(ofSize: 12)
-        return label
-    }()
-    
-    private lazy var documentErrorLabel: UILabel = {
-        let label = UILabel()
-        label.text = "Документ должен содержать от 6 до 20 символов"
+        label.numberOfLines = 0
         label.textColor = .red
         label.font = UIFont.systemFont(ofSize: 12)
         return label
@@ -123,44 +117,20 @@ final class LoginByDocumentViewController: UIViewController {
         stackView.addArrangedSubview(registerLabel)
         return stackView
     }()
-    // проверка на количество символов 
-    private var isPasswordValid: Bool {
-        if let password = passwordTextField.text, (6...20).contains(password.count) {
-            return true
-        }
-        return false
-    }
-    
-    private var isDocumentValid: Bool {
-        if let document = documentTextField.text, (6...20).contains(document.count) {
-            return true
-        }
-        return false
-    }
     
     // MARK: - LifeCycle
     
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
-        documentTextField.delegate = self
-        passwordTextField.delegate = self
-        
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(keybordWillHide), name: UIResponder.keyboardWillHideNotification, object: nil)
-        
         viewModel = LoginByDocumentViewModel()
-        
+    
         setupConstraints()
-        updateButtonState()
-        
-        
+        setupKeyboardNotifications()
     }
     
     private func setupConstraints() {
-        
-        
-        [logoImageView, titleLabel, documentTextField, passwordErrorLabel, documentErrorLabel, passwordTextField, forgotPasswordLabel, button, labelsStackView].forEach {view.addSubview($0)}
+        [logoImageView, titleLabel, documentTextField, errorLabel, passwordTextField, forgotPasswordLabel, button, labelsStackView].forEach {view.addSubview($0)}
         
         logoImageView.snp.makeConstraints { make in
             make.centerX.equalToSuperview()
@@ -186,18 +156,13 @@ final class LoginByDocumentViewController: UIViewController {
             make.height.equalTo(documentTextField)
         }
         
-        documentErrorLabel.snp.makeConstraints { make in
+        errorLabel.snp.makeConstraints { make in
             make.leading.equalTo(documentTextField)
             make.top.equalTo(passwordTextField.snp.bottom).offset(10)
         }
         
-        passwordErrorLabel.snp.makeConstraints { make in
-            make.leading.equalTo(documentTextField)
-            make.top.equalTo(documentErrorLabel.snp.bottom).offset(5)
-        }
-        
         forgotPasswordLabel.snp.makeConstraints { make in
-            make.top.equalTo(passwordErrorLabel.snp.bottom).offset(10)
+            make.top.equalTo(errorLabel.snp.bottom).offset(10)
             make.trailing.equalTo(documentTextField)
         }
         
@@ -214,24 +179,27 @@ final class LoginByDocumentViewController: UIViewController {
         }
     }
     
-    private func updateButtonState() {
-        button.isUserInteractionEnabled = isPasswordValid && isDocumentValid
-        button.backgroundColor = button.isUserInteractionEnabled ? UIColor.yellow : UIColor.gray
+    // MARK: - Funcs
+    
+    // метод для управления отображением клавиатуры и сдвигом экрана
+    private func setupKeyboardNotifications() {
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keybordWillHide), name: UIResponder.keyboardWillHideNotification, object: nil)
     }
     
-    private func updateErrorLabels() {
-        if isPasswordValid {
-            passwordErrorLabel.isHidden = true
-        } else {
-            passwordErrorLabel.isHidden = false
-        }
-        if isDocumentValid {
-            documentErrorLabel.isHidden = true
-        } else {
-            documentErrorLabel.isHidden = false
-        }
+    // проверка на количество символов
+    private func validateInput(_ inputText: String, for range: ClosedRange<Int>) -> Bool {
+        return range.contains(inputText.count)
     }
     
+    private func updateErrorLabel(_ errorText: String) {
+        errorLabel.text = errorText
+    }
+    
+    private func updateButtonState(_ isEnabled: Bool) {
+        button.isUserInteractionEnabled = isEnabled
+        button.backgroundColor = isEnabled ? UIColor.yellow : UIColor.gray
+    }
     
     // MARK: - @objc fun
     
@@ -244,19 +212,36 @@ final class LoginByDocumentViewController: UIViewController {
     }
     
     @objc func textFieldDidChange() {
-        updateButtonState()
-        updateErrorLabels()
+        let documentNumber = documentTextField.text ?? ""
+        let password = passwordTextField.text ?? ""
+        
+        let isDocumentValid = validateInput(documentNumber, for: 6...20)
+        let isPasswordValid = validateInput(password, for: 6...20)
+        
+        let documentError = isDocumentValid ? "" : "Документ должен содержать от 6 до 20 символов"
+        let passwordError = isPasswordValid ? "" : "Пароль должен содержать от 6 до 20 символов"
+        
+        updateErrorLabel(documentError + "\n" + passwordError)
+        updateButtonState(isDocumentValid && isPasswordValid)
     }
     
     @objc func buttonDidTapped() {
-        print("Button did taped")
+        let documentNumber = documentTextField.text ?? ""
+        let password = passwordTextField.text ?? ""
+        let message = viewModel?.authentificateUserBy(documentNumber: documentNumber, password: password)
+        errorLabel.text = message
     }
     
+    // метод скрытия клавиатуры
+    @objc func keybordWillHide(notification: NSNotification) {
+        self.view.frame.origin.y = 0
+    }
+    
+    // метод показа клавиатуры и подъёма экрана наверх
     @objc func keyboardWillShow(notification: NSNotification) {
         if let keyboardSize = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue {
             let buttonFrameInWindow = button.convert(button.bounds, to: nil)
             let bottomOfButton = buttonFrameInWindow.maxY
-            
             let offset = bottomOfButton + 10 - (self.view.frame.size.height - keyboardSize.height)
             
             if offset > 0 {
@@ -264,12 +249,9 @@ final class LoginByDocumentViewController: UIViewController {
             }
         }
     }
-    
-    @objc func keybordWillHide(notification: NSNotification) {
-        self.view.frame.origin.y = 0
-    }
 }
 
+// MARK: - Extensions
 extension LoginByDocumentViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         view.endEditing(true)
