@@ -55,6 +55,7 @@ private enum Styles {
 final class LoginByDocumentViewController: UIViewController {
     
     var viewModel: LoginByDocumentViewModel?
+    var coordinator: AppCoordinator?
     
     private lazy var logoImageView: UIImageView = {
         let imageView = UIImageView()
@@ -74,7 +75,6 @@ final class LoginByDocumentViewController: UIViewController {
         let textField = UITextField()
         textField.placeholder = TextLabels.LoginByDocumentVC.email
         textField.borderStyle = .roundedRect
-        textField.keyboardType = .phonePad
         textField.backgroundColor = Styles.textFieldBackgroundColor
         textField.clearButtonMode = .whileEditing
         textField.delegate = self
@@ -183,10 +183,18 @@ final class LoginByDocumentViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
-        viewModel = LoginByDocumentViewModel()
         
         setupConstraints()
         setupKeyboardNotifications()
+    }
+    
+    init(viewModel: LoginByDocumentViewModel) {
+        self.viewModel = viewModel
+        super.init(nibName: nil, bundle: nil)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
     
     private func setupConstraints() {
